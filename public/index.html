@@ -299,7 +299,7 @@
         <button class="btn primary" id="playBtn" aria-label="Play / Pause">&#9654; PLAY</button>
         <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
         <div class="vol-wrap">
-          <span class="vol-icon">&#128266;</span>
+          <span class="vol-icon" id="volIcon" style="cursor:pointer" title="Mute / Unmute">&#128266;</span>
           <input type="range" class="vol-slider" id="vol" min="0" max="1"
                  step="0.02" value="1" aria-label="Volume">
         </div>
@@ -365,9 +365,10 @@
   var vizCanvas = document.getElementById('viz');
   var vctx     = vizCanvas.getContext('2d');
 
-  var audioCtx, source, analyser, dataArr;
+  var audioCtx, source, analyser, gainNode, dataArr;
   var vizRAF;
   var playing = false;
+  var muted = false;
 
   function fmt(s) {
     if (!isFinite(s)) return '--:--';
@@ -388,12 +389,16 @@
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
       dataArr  = new Uint8Array(analyser.frequencyBinCount);
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = volSlider.value;
       source.connect(analyser);
-      analyser.connect(audioCtx.destination);
+      analyser.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
     } catch (e) {
       /* CORS or API error: route audio directly to output, skip visualizer */
       analyser = null;
       dataArr  = null;
+      gainNode = null;
       if (source) {
         try { source.connect(audioCtx.destination); } catch (e2) {}
       }
@@ -507,7 +512,25 @@
   });
 
   volSlider.addEventListener('input', function () {
-    audio.volume = volSlider.value;
+    if (gainNode) {
+      gainNode.gain.value = volSlider.value;
+    } else {
+      audio.volume = volSlider.value;
+    }
+    if (muted && volSlider.value > 0) {
+      muted = false;
+      audio.muted = false;
+      document.getElementById('volIcon').textContent = '🔊';
+    }
+  });
+
+  document.getElementById('volIcon').addEventListener('click', function () {
+    muted = !muted;
+    audio.muted = muted;
+    this.textContent = muted ? '🔇' : '🔊';
+    if (playing) {
+      setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
+    }
   });
 })();
 </script>
