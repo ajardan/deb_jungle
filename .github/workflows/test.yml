@@ -8,6 +8,7 @@ on:
       - 'playwright.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - '.github/workflows/**'
   pull_request:
     paths:
       - 'public/**'
@@ -15,6 +16,7 @@ on:
       - 'playwright.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - '.github/workflows/**'
 
 jobs:
   test:
