@@ -381,6 +381,7 @@
   var vizRAF;
   var playing = false;
   var muted = false;
+  var gainConnected = false;
 
   function fmt(s) {
     if (!isFinite(s)) return '--:--';
@@ -413,10 +414,13 @@
       analyser.fftSize = 64;
       dataArr  = new Uint8Array(analyser.frequencyBinCount);
       gainNode = audioCtx.createGain();
-      gainNode.gain.value = muted ? 0 : parseFloat(volSlider.value);
+      gainNode.gain.value = parseFloat(volSlider.value);
       source.connect(analyser);
       analyser.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      if (!muted) {
+        gainNode.connect(audioCtx.destination);
+        gainConnected = true;
+      }
     } catch (e) {
       /* CORS or API error: route audio directly to output, skip visualizer */
       analyser = null;
@@ -569,17 +573,21 @@
   });
 
   function setGain(val) {
-    if (!gainNode) { try { audio.volume = val; } catch (e) {} return; }
-    try { gainNode.gain.cancelScheduledValues(0); } catch (e) {}
-    gainNode.gain.value = val;
+    if (gainNode) { gainNode.gain.value = val; return; }
+    try { audio.volume = val; } catch (e) {}
   }
 
   function handleVolChange() {
     var val = parseFloat(volSlider.value);
+    /* Moving slider > 0 while muted auto-unmutes */
     if (muted && val > 0) {
       muted = false;
       audio.muted = false;
       document.getElementById('volIcon').innerHTML = '&#128266;';
+      if (gainNode && !gainConnected) {
+        gainNode.gain.value = val;
+        try { gainNode.connect(audioCtx.destination); gainConnected = true; } catch (e) {}
+      }
     }
     if (!muted) setGain(val);
   }
@@ -590,12 +598,19 @@
 
   document.getElementById('volIcon').addEventListener('click', function () {
     muted = !muted;
-    /* Set icon first — an error below must not prevent the visual update */
     this.innerHTML = muted ? '&#128263;' : '&#128266;';
-    /* audio.muted silences the source before it enters the Web Audio graph */
     audio.muted = muted;
-    /* gainNode.gain silences the graph output — belt-and-suspenders */
-    setGain(muted ? 0 : parseFloat(volSlider.value));
+    if (gainNode) {
+      /* gainNode.gain.value = 0 is unreliable on iOS Safari; physically
+         disconnecting the node from the destination is the only guaranteed
+         way to silence the Web Audio graph on iOS. */
+      if (muted && gainConnected) {
+        try { gainNode.disconnect(); gainConnected = false; } catch (e) {}
+      } else if (!muted && !gainConnected) {
+        gainNode.gain.value = parseFloat(volSlider.value);
+        try { gainNode.connect(audioCtx.destination); gainConnected = true; } catch (e) {}
+      }
+    }
     if (playing) {
       setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
     }
