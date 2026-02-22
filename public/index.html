@@ -384,10 +384,15 @@
   function initAudioCtx() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    /* iOS suspends AudioContext when switching apps — resume it immediately */
+    /* iOS suspends AudioContext when switching apps.
+       Pause the audio element so time doesn't drift silently;
+       auto-resume both when the AudioContext comes back. */
     audioCtx.onstatechange = function () {
       if (audioCtx.state === 'suspended' && playing) {
-        audioCtx.resume();
+        audio.pause();
+        audioCtx.resume().catch(function () {});
+      } else if (audioCtx.state === 'running' && playing && audio.paused) {
+        audio.play().catch(function () {});
       }
     };
     try {
@@ -451,9 +456,11 @@
   window.addEventListener('resize', resizeViz);
   drawViz();
 
-  /* ── Keep AudioContext alive in background (iOS suspends on app switch) ── */
+  /* ── Resume when returning to the app (triggers onstatechange → audio.play) ── */
   document.addEventListener('visibilitychange', function () {
-    if (audioCtx && playing) audioCtx.resume();
+    if (document.visibilityState === 'visible' && audioCtx && playing) {
+      audioCtx.resume().catch(function () {});
+    }
   });
 
   /* ── Media Session (lock screen / background playback on mobile) ── */
