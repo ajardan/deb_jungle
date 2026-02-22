@@ -31,3 +31,19 @@ The `<audio>` element has `crossorigin="anonymous"` because `raw.githubuserconte
 
 ## Browser targets
 Safari and Chrome (macOS). Cross-browser CSS includes `-webkit-appearance` prefixes on range inputs.
+
+## Testing
+
+Playwright (Chromium) tests live in `tests/player.spec.js`. They run against `public/index.html` via `file://` and mock the AudioContext + network MP3 request so no real audio hardware or internet is needed.
+
+**Run tests:**
+```
+pnpm test              # one-shot, all 15 tests
+pnpm test:watch        # nodemon re-runs on changes to public/
+```
+
+Tests cover: initial state, play/pause toggle, stop reset, mute toggle, volume slider auto-unmute, seek slider, timeupdate display, and spacebar shortcut.
+
+A **pre-commit hook** (`.git/hooks/pre-commit`) automatically runs `pnpm test` before every commit and blocks the commit if any test fails.
+
+**Toolchain:** Node 25 (via Homebrew), pnpm 10, Playwright 1.58.

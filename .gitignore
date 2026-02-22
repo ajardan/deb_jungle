@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# pnpm
+.pnpm-store/
+
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Local MP3 (large binary; served remotely in production)
+*.mp3

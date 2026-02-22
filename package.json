@@ -1,0 +1,13 @@
+{
+  "name": "dnb-md",
+  "private": true,
+  "packageManager": "pnpm@10.30.1",
+  "scripts": {
+    "test": "playwright test",
+    "test:watch": "nodemon --watch public/ --ext html --exec 'pnpm test -- --reporter=line' --delay 0.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "nodemon": "^3.1.0"
+  }
+}
