@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>// MATRIX PLAYER</title>
+  <title>Jungle.md</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -270,7 +270,7 @@
       <div class="dot"></div>
       <div class="dot" style="opacity:.5"></div>
       <div class="dot" style="opacity:.25"></div>
-      // MATRIX_PLAYER v1.0
+      Jungle.md
       <span>SYS:AUDIO</span>
     </div>
 
@@ -312,7 +312,7 @@
 </div>
 
 <audio id="audio" preload="metadata" crossorigin="anonymous">
-  <source src="mAcRoS-Junglebrain.mp3" type="audio/mpeg">
+  <source src="https://raw.githubusercontent.com/ajardan/deb_jungle/refs/heads/master/mAcRoS-Junglebrain.mp3" type="audio/mpeg">
 </audio>
 
 <script>
@@ -383,12 +383,21 @@
   function initAudioCtx() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    source   = audioCtx.createMediaElementSource(audio);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
-    dataArr  = new Uint8Array(analyser.frequencyBinCount);
-    source.connect(analyser);
-    analyser.connect(audioCtx.destination);
+    try {
+      source   = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      dataArr  = new Uint8Array(analyser.frequencyBinCount);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+    } catch (e) {
+      /* CORS or API error: route audio directly to output, skip visualizer */
+      analyser = null;
+      dataArr  = null;
+      if (source) {
+        try { source.connect(audioCtx.destination); } catch (e2) {}
+      }
+    }
   }
 
   function drawViz() {
@@ -435,7 +444,7 @@
   playBtn.addEventListener('click', function () {
     if (!playing) {
       initAudioCtx();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       audio.play().then(function () {
         playing = true;
         playBtn.innerHTML = '&#9646;&#9646; PAUSE';
@@ -468,6 +477,9 @@
     if (!audio.duration) return;
     seek.value = (audio.currentTime / audio.duration) * 100;
     elapsed.textContent = fmt(audio.currentTime);
+    if (playing) {
+      setStatus('STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
+    }
   });
 
   audio.addEventListener('loadedmetadata', function () {
@@ -485,7 +497,7 @@
   });
 
   audio.addEventListener('error', function () {
-    setStatus('ERROR: CANNOT LOAD mAcRoS-Junglebrain.mp3');
+    setStatus('ERROR: CANNOT LOAD — CHECK NETWORK OR FILE URL');
   });
 
   seek.addEventListener('input', function () {
