@@ -445,6 +445,29 @@
   window.addEventListener('resize', resizeViz);
   drawViz();
 
+  /* ── Keep AudioContext alive in background ── */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended' && playing) {
+      audioCtx.resume();
+    }
+  });
+
+  /* ── Media Session (lock screen / background playback on mobile) ── */
+  function updateMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: 'Junglebrain',
+      artist: 'mAcRoS',
+      album: 'Jungle.md'
+    });
+    navigator.mediaSession.setActionHandler('play', function () { playBtn.click(); });
+    navigator.mediaSession.setActionHandler('pause', function () { playBtn.click(); });
+    navigator.mediaSession.setActionHandler('stop', function () { stopBtn.click(); });
+    navigator.mediaSession.setActionHandler('seekto', function (e) {
+      if (audio.duration) audio.currentTime = e.seekTime;
+    });
+  }
+
   /* ── Controls ── */
   playBtn.addEventListener('click', function () {
     if (!playing) {
@@ -455,6 +478,8 @@
         playBtn.innerHTML = '&#9646;&#9646; PAUSE';
         playBtn.classList.add('active');
         setStatus('STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
+        updateMediaSession();
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
       }).catch(function (err) {
         setStatus('ERROR: ' + err.message);
       });
@@ -464,6 +489,7 @@
       playBtn.innerHTML = '&#9654; PLAY';
       playBtn.classList.remove('active');
       setStatus('PAUSED');
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     }
   });
 
@@ -476,6 +502,7 @@
     seek.value = 0;
     elapsed.textContent = '00:00';
     setStatus('STOPPED — READY');
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
   });
 
   audio.addEventListener('timeupdate', function () {
