@@ -209,7 +209,19 @@
       margin-left: auto;
       flex-shrink: 0;
     }
-    .vol-icon { font-size: 0.9rem; opacity: 0.7; user-select: none; }
+    .vol-icon {
+      font-size: 0.9rem;
+      opacity: 0.7;
+      user-select: none;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: inherit;
+      font-family: inherit;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
     .vol-slider {
       -webkit-appearance: none;
       appearance: none;
@@ -299,7 +311,7 @@
         <button class="btn primary" id="playBtn" aria-label="Play / Pause">&#9654; PLAY</button>
         <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
         <div class="vol-wrap">
-          <span class="vol-icon" id="volIcon" style="cursor:pointer" title="Mute / Unmute">&#128266;</span>
+          <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">&#128266;</button>
           <input type="range" class="vol-slider" id="vol" min="0" max="1"
                  step="0.02" value="1" aria-label="Volume">
         </div>
@@ -401,7 +413,7 @@
       analyser.fftSize = 64;
       dataArr  = new Uint8Array(analyser.frequencyBinCount);
       gainNode = audioCtx.createGain();
-      gainNode.gain.value = volSlider.value;
+      gainNode.gain.value = muted ? 0 : parseFloat(volSlider.value);
       source.connect(analyser);
       analyser.connect(gainNode);
       gainNode.connect(audioCtx.destination);
@@ -556,12 +568,10 @@
     }
   });
 
-  function applyGain(val) {
-    if (gainNode) {
-      gainNode.gain.setValueAtTime(val, audioCtx.currentTime);
-    } else {
-      try { audio.volume = val; } catch (e) {}
-    }
+  function setGain(val) {
+    if (!gainNode) { try { audio.volume = val; } catch (e) {} return; }
+    try { gainNode.gain.cancelScheduledValues(0); } catch (e) {}
+    gainNode.gain.value = val;
   }
 
   function handleVolChange() {
@@ -569,21 +579,23 @@
     if (muted && val > 0) {
       muted = false;
       audio.muted = false;
-      document.getElementById('volIcon').textContent = '🔊';
+      document.getElementById('volIcon').innerHTML = '&#128266;';
     }
-    if (!muted) applyGain(val);
+    if (!muted) setGain(val);
   }
 
-  /* iOS Safari fires 'change' on drag-end but not 'input' continuously */
+  /* iOS Safari fires 'change' on drag-end but not 'input' during drag */
   volSlider.addEventListener('input', handleVolChange);
   volSlider.addEventListener('change', handleVolChange);
 
   document.getElementById('volIcon').addEventListener('click', function () {
     muted = !muted;
-    /* audio.muted works on iOS even without Web Audio; gainNode silences the graph */
+    /* Set icon first — an error below must not prevent the visual update */
+    this.innerHTML = muted ? '&#128263;' : '&#128266;';
+    /* audio.muted silences the source before it enters the Web Audio graph */
     audio.muted = muted;
-    if (gainNode) gainNode.gain.setValueAtTime(muted ? 0 : parseFloat(volSlider.value), audioCtx.currentTime);
-    this.textContent = muted ? '🔇' : '🔊';
+    /* gainNode.gain silences the graph output — belt-and-suspenders */
+    setGain(muted ? 0 : parseFloat(volSlider.value));
     if (playing) {
       setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
     }
