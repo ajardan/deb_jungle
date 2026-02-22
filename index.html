@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>// MATRIX PLAYER</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #00ff41;
+      --green-dim: #00b32c;
+      --green-dark: #003b0f;
+      --green-glow: rgba(0, 255, 65, 0.35);
+      --bg: #000;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--green);
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+    }
+
+    /* ── Matrix rain canvas ── */
+    #rain {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.18;
+    }
+
+    /* ── Scanline overlay ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* ── Layout ── */
+    .shell {
+      position: relative;
+      z-index: 2;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .terminal {
+      width: min(520px, 94vw);
+      border: 1px solid var(--green-dim);
+      border-radius: 2px;
+      background: rgba(0, 10, 2, 0.88);
+      box-shadow: 0 0 32px var(--green-glow), inset 0 0 12px rgba(0,255,65,0.05);
+      overflow: hidden;
+    }
+
+    /* ── Title bar ── */
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--green-dark);
+      border-bottom: 1px solid var(--green-dim);
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .titlebar .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green-dim);
+      box-shadow: 0 0 6px var(--green-glow);
+    }
+    .titlebar span { margin-left: auto; opacity: 0.6; font-size: 0.65rem; }
+
+    /* ── Body ── */
+    .body {
+      padding: 28px 32px 32px;
+    }
+
+    .label {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      opacity: 0.55;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    /* ── Track name ── */
+    .track-wrap {
+      overflow: hidden;
+      border: 1px solid var(--green-dark);
+      padding: 6px 10px;
+      margin-bottom: 22px;
+      background: rgba(0,255,65,0.03);
+    }
+    .track-name {
+      white-space: nowrap;
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green);
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrap { margin-bottom: 10px; }
+    .progress-bar {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--green-dark);
+      border: 1px solid var(--green-dim);
+      cursor: pointer;
+      outline: none;
+      border-radius: 0;
+    }
+    .progress-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green-glow);
+      cursor: pointer;
+      border-radius: 0;
+    }
+    .progress-bar::-moz-range-thumb {
+      width: 14px; height: 14px;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green-glow);
+      cursor: pointer;
+      border: none;
+      border-radius: 0;
+    }
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      opacity: 0.6;
+      margin-top: 5px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Visualizer ── */
+    #viz {
+      display: block;
+      width: 100%;
+      height: 52px;
+      margin: 18px 0;
+      border: 1px solid var(--green-dark);
+      background: rgba(0,255,65,0.02);
+    }
+
+    /* ── Controls row ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .btn {
+      background: none;
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: inherit;
+      font-size: 0.8rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 9px 22px;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s, color 0.15s;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:hover, .btn:focus-visible {
+      background: rgba(0,255,65,0.12);
+      box-shadow: 0 0 12px var(--green-glow);
+    }
+    .btn:active { background: rgba(0,255,65,0.22); }
+    .btn.primary {
+      border-color: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+      font-size: 0.9rem;
+      padding: 10px 28px;
+    }
+    .btn.active {
+      background: rgba(0,255,65,0.15);
+      box-shadow: 0 0 16px var(--green-glow);
+    }
+
+    /* ── Volume ── */
+    .vol-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .vol-icon { font-size: 0.9rem; opacity: 0.7; user-select: none; }
+    .vol-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 80px;
+      height: 4px;
+      background: var(--green-dark);
+      border: 1px solid var(--green-dim);
+      cursor: pointer;
+      outline: none;
+      border-radius: 0;
+    }
+    .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      background: var(--green);
+      cursor: pointer;
+      border-radius: 0;
+    }
+    .vol-slider::-moz-range-thumb {
+      width: 12px; height: 12px;
+      background: var(--green);
+      cursor: pointer;
+      border: none;
+      border-radius: 0;
+    }
+
+    /* ── Status line ── */
+    .status {
+      margin-top: 18px;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      opacity: 0.45;
+      min-height: 1em;
+      text-transform: uppercase;
+    }
+    .status::before { content: '> '; }
+
+    /* ── Cursor blink ── */
+    .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      background: var(--green);
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body>
+
+<canvas id="rain"></canvas>
+
+<div class="shell">
+  <div class="terminal" role="main">
+
+    <div class="titlebar">
+      <div class="dot"></div>
+      <div class="dot" style="opacity:.5"></div>
+      <div class="dot" style="opacity:.25"></div>
+      // MATRIX_PLAYER v1.0
+      <span>SYS:AUDIO</span>
+    </div>
+
+    <div class="body">
+      <div class="label">NOW PLAYING</div>
+      <div class="track-wrap">
+        <div class="track-name" id="trackName">
+          <span style="opacity:0.6;font-size:0.85em">mAcRoS</span>
+          &nbsp;&mdash;&nbsp;
+          Junglebrain<span class="cursor"></span>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <input type="range" class="progress-bar" id="seek" min="0" max="100" value="0"
+               step="0.1" aria-label="Seek">
+        <div class="time-row">
+          <span id="elapsed">00:00</span>
+          <span id="duration">--:--</span>
+        </div>
+      </div>
+
+      <canvas id="viz" aria-hidden="true"></canvas>
+
+      <div class="controls">
+        <button class="btn primary" id="playBtn" aria-label="Play / Pause">&#9654; PLAY</button>
+        <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
+        <div class="vol-wrap">
+          <span class="vol-icon">&#128266;</span>
+          <input type="range" class="vol-slider" id="vol" min="0" max="1"
+                 step="0.02" value="1" aria-label="Volume">
+        </div>
+      </div>
+
+      <div class="status" id="status">READY — PRESS PLAY TO INITIALIZE<span class="cursor"></span></div>
+    </div>
+
+  </div>
+</div>
+
+<audio id="audio" preload="metadata" crossorigin="anonymous">
+  <source src="mAcRoS-Junglebrain.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Matrix rain ── */
+  (function rainInit() {
+    var canvas = document.getElementById('rain');
+    var ctx = canvas.getContext('2d');
+    var cols, drops;
+    var chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF';
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cols = Math.floor(canvas.width / 16);
+      drops = Array.from({ length: cols }, function () {
+        return Math.random() * -canvas.height / 16 | 0;
+      });
+    }
+
+    function draw() {
+      ctx.fillStyle = 'rgba(0,0,0,0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00ff41';
+      ctx.font = '14px Courier New, monospace';
+      for (var i = 0; i < cols; i++) {
+        var ch = chars[Math.random() * chars.length | 0];
+        ctx.fillText(ch, i * 16, drops[i] * 16);
+        if (drops[i] * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    setInterval(draw, 50);
+  })();
+
+  /* ── Audio + Visualizer ── */
+  var audio    = document.getElementById('audio');
+  var playBtn  = document.getElementById('playBtn');
+  var stopBtn  = document.getElementById('stopBtn');
+  var seek     = document.getElementById('seek');
+  var volSlider = document.getElementById('vol');
+  var elapsed  = document.getElementById('elapsed');
+  var duration = document.getElementById('duration');
+  var status   = document.getElementById('status');
+  var vizCanvas = document.getElementById('viz');
+  var vctx     = vizCanvas.getContext('2d');
+
+  var audioCtx, source, analyser, dataArr;
+  var vizRAF;
+  var playing = false;
+
+  function fmt(s) {
+    if (!isFinite(s)) return '--:--';
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function setStatus(msg) {
+    status.innerHTML = msg + '<span class="cursor"></span>';
+  }
+
+  function initAudioCtx() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    source   = audioCtx.createMediaElementSource(audio);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    dataArr  = new Uint8Array(analyser.frequencyBinCount);
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  }
+
+  function drawViz() {
+    vizRAF = requestAnimationFrame(drawViz);
+    var w = vizCanvas.width, h = vizCanvas.height;
+
+    if (analyser) analyser.getByteFrequencyData(dataArr);
+
+    vctx.clearRect(0, 0, w, h);
+
+    if (!analyser || !playing) {
+      /* idle pulse */
+      var t = Date.now() / 1000;
+      vctx.strokeStyle = 'rgba(0,255,65,0.25)';
+      vctx.lineWidth = 1;
+      vctx.beginPath();
+      for (var x = 0; x < w; x++) {
+        var y = h / 2 + Math.sin((x / w) * Math.PI * 8 + t * 2) * 4;
+        x === 0 ? vctx.moveTo(x, y) : vctx.lineTo(x, y);
+      }
+      vctx.stroke();
+      return;
+    }
+
+    var barW = Math.floor(w / dataArr.length);
+    for (var i = 0; i < dataArr.length; i++) {
+      var barH = (dataArr[i] / 255) * h;
+      var alpha = 0.4 + (dataArr[i] / 255) * 0.6;
+      vctx.fillStyle = 'rgba(0,255,65,' + alpha + ')';
+      vctx.fillRect(i * barW, h - barH, barW - 1, barH);
+    }
+  }
+
+  function resizeViz() {
+    vizCanvas.width  = vizCanvas.offsetWidth;
+    vizCanvas.height = vizCanvas.offsetHeight;
+  }
+
+  resizeViz();
+  window.addEventListener('resize', resizeViz);
+  drawViz();
+
+  /* ── Controls ── */
+  playBtn.addEventListener('click', function () {
+    if (!playing) {
+      initAudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      audio.play().then(function () {
+        playing = true;
+        playBtn.innerHTML = '&#9646;&#9646; PAUSE';
+        playBtn.classList.add('active');
+        setStatus('STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
+      }).catch(function (err) {
+        setStatus('ERROR: ' + err.message);
+      });
+    } else {
+      audio.pause();
+      playing = false;
+      playBtn.innerHTML = '&#9654; PLAY';
+      playBtn.classList.remove('active');
+      setStatus('PAUSED');
+    }
+  });
+
+  stopBtn.addEventListener('click', function () {
+    audio.pause();
+    audio.currentTime = 0;
+    playing = false;
+    playBtn.innerHTML = '&#9654; PLAY';
+    playBtn.classList.remove('active');
+    seek.value = 0;
+    elapsed.textContent = '00:00';
+    setStatus('STOPPED — READY');
+  });
+
+  audio.addEventListener('timeupdate', function () {
+    if (!audio.duration) return;
+    seek.value = (audio.currentTime / audio.duration) * 100;
+    elapsed.textContent = fmt(audio.currentTime);
+  });
+
+  audio.addEventListener('loadedmetadata', function () {
+    duration.textContent = fmt(audio.duration);
+    setStatus('FILE LOADED — READY');
+  });
+
+  audio.addEventListener('ended', function () {
+    playing = false;
+    playBtn.innerHTML = '&#9654; PLAY';
+    playBtn.classList.remove('active');
+    seek.value = 0;
+    elapsed.textContent = '00:00';
+    setStatus('PLAYBACK COMPLETE');
+  });
+
+  audio.addEventListener('error', function () {
+    setStatus('ERROR: CANNOT LOAD mAcRoS-Junglebrain.mp3');
+  });
+
+  seek.addEventListener('input', function () {
+    if (audio.duration) {
+      audio.currentTime = (seek.value / 100) * audio.duration;
+    }
+  });
+
+  volSlider.addEventListener('input', function () {
+    audio.volume = volSlider.value;
+  });
+})();
+</script>
+</body>
+</html>
