@@ -13,5 +13,3 @@ blob-report/
 .DS_Store
 **/.DS_Store
 
-# Local MP3 (large binary; served remotely in production)
-*.mp3
