@@ -519,14 +519,17 @@
     }
     if (muted && volSlider.value > 0) {
       muted = false;
-      audio.muted = false;
       document.getElementById('volIcon').textContent = '🔊';
     }
   });
 
   document.getElementById('volIcon').addEventListener('click', function () {
     muted = !muted;
-    audio.muted = muted;
+    if (gainNode) {
+      gainNode.gain.value = muted ? 0 : volSlider.value;
+    } else {
+      audio.muted = muted;
+    }
     this.textContent = muted ? '🔇' : '🔊';
     if (playing) {
       setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
