@@ -556,25 +556,33 @@
     }
   });
 
-  volSlider.addEventListener('input', function () {
+  function applyGain(val) {
     if (gainNode) {
-      gainNode.gain.value = volSlider.value;
+      gainNode.gain.setValueAtTime(val, audioCtx.currentTime);
     } else {
-      audio.volume = volSlider.value;
+      try { audio.volume = val; } catch (e) {}
     }
-    if (muted && volSlider.value > 0) {
+  }
+
+  function handleVolChange() {
+    var val = parseFloat(volSlider.value);
+    if (muted && val > 0) {
       muted = false;
+      audio.muted = false;
       document.getElementById('volIcon').textContent = '🔊';
     }
-  });
+    if (!muted) applyGain(val);
+  }
+
+  /* iOS Safari fires 'change' on drag-end but not 'input' continuously */
+  volSlider.addEventListener('input', handleVolChange);
+  volSlider.addEventListener('change', handleVolChange);
 
   document.getElementById('volIcon').addEventListener('click', function () {
     muted = !muted;
-    if (gainNode) {
-      gainNode.gain.value = muted ? 0 : volSlider.value;
-    } else {
-      audio.muted = muted;
-    }
+    /* audio.muted works on iOS even without Web Audio; gainNode silences the graph */
+    audio.muted = muted;
+    if (gainNode) gainNode.gain.setValueAtTime(muted ? 0 : parseFloat(volSlider.value), audioCtx.currentTime);
     this.textContent = muted ? '🔇' : '🔊';
     if (playing) {
       setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
