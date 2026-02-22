@@ -1,4 +1,4 @@
-# dnb.md — Project Context
+# dnb.md and jungle.md — Project Context
 
 ## What this is
 A single-file static HTML music player with a Matrix (black/green) aesthetic. No build tools, no dependencies, no server required — open `index.html` directly in a browser.
