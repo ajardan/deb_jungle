@@ -253,8 +253,9 @@
       flex-shrink: 0;
     }
     .vol-icon {
-      font-size: 0.9rem;
-      opacity: 0.7;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      opacity: 0.55;
       user-select: none;
       background: none;
       border: none;
@@ -264,7 +265,9 @@
       font-family: inherit;
       line-height: 1;
       -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
     }
+    .vol-icon:hover { opacity: 0.9; }
     .vol-slider {
       -webkit-appearance: none;
       appearance: none;
@@ -359,7 +362,7 @@
         <button class="btn primary" id="playBtn" aria-label="Play / Pause">&#9654; PLAY</button>
         <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
         <div class="vol-wrap">
-          <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">&#128266;</button>
+          <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">[MUTE]</button>
           <input type="range" class="vol-slider" id="vol" min="0" max="1"
                  step="0.02" value="1" aria-label="Volume">
         </div>
@@ -631,7 +634,7 @@
     if (muted && val > 0) {
       muted = false;
       audio.muted = false;
-      document.getElementById('volIcon').innerHTML = '&#128266;';
+      document.getElementById('volIcon').innerHTML = '[MUTE]';
       if (gainNode && !gainConnected) {
         gainNode.gain.value = val;
         try { gainNode.connect(audioCtx.destination); gainConnected = true; } catch (e) {}
@@ -646,7 +649,7 @@
 
   document.getElementById('volIcon').addEventListener('click', function () {
     muted = !muted;
-    this.innerHTML = muted ? '&#128263;' : '&#128266;';
+    this.innerHTML = muted ? '[UNMUTE]' : '[MUTE]';
     audio.muted = muted;
     if (gainNode) {
       /* gainNode.gain.value = 0 is unreliable on iOS Safari; physically
