@@ -251,6 +251,7 @@
       gap: 8px;
       margin-left: auto;
       flex-shrink: 0;
+      padding-right: 6px;
     }
     .vol-icon {
       font-size: 0.65rem;
@@ -293,10 +294,9 @@
       border: none;
       border-radius: 0;
     }
-    /* On touch devices shorten the slider and add right breathing room */
+    /* On touch devices shorten the slider */
     @media (hover: none) and (pointer: coarse) {
       .vol-slider { width: 60px; }
-      .vol-wrap { padding-right: 6px; }
     }
 
     /* ── Status line ── */
