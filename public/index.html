@@ -210,7 +210,7 @@
     .controls {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       margin-top: 22px;
     }
 
@@ -320,6 +320,37 @@
       animation: blink 1s step-end infinite;
     }
     @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Playlist ── */
+    .playlist-wrap { margin-top: 14px; }
+    .playlist-list {
+      border: 1px solid var(--green-dark);
+      background: rgba(0,255,65,0.02);
+      max-height: 130px;
+      overflow-y: auto;
+    }
+    .playlist-list::-webkit-scrollbar { width: 4px; }
+    .playlist-list::-webkit-scrollbar-thumb { background: var(--green-dim); }
+    .playlist-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(0,255,65,0.06);
+      transition: background 0.1s;
+    }
+    .playlist-item:last-child { border-bottom: none; }
+    .playlist-item:hover { background: rgba(0,255,65,0.08); }
+    .playlist-item.active {
+      background: rgba(0,255,65,0.12);
+      text-shadow: 0 0 6px var(--green-glow);
+    }
+    .pl-num { opacity: 0.35; font-size: 0.6rem; min-width: 1.5em; }
+    .pl-artist { opacity: 0.6; }
+    .btn.sm { padding: 9px 10px; }
   </style>
 </head>
 <body>
@@ -361,6 +392,8 @@
       <div class="controls">
         <button class="btn primary" id="playBtn" aria-label="Play / Pause">&#9654; PLAY</button>
         <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
+        <button class="btn sm" id="prevBtn" aria-label="Previous track">&#9664; PREV</button>
+        <button class="btn sm" id="nextBtn" aria-label="Next track">NEXT &#9654;</button>
         <div class="vol-wrap">
           <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">[MUTE]</button>
           <input type="range" class="vol-slider" id="vol" min="0" max="1"
@@ -369,14 +402,17 @@
       </div>
 
       <div class="status" id="status">READY — PRESS PLAY TO INITIALIZE<span class="cursor"></span></div>
+
+      <div class="playlist-wrap">
+        <div class="label" style="margin-bottom:6px">PLAYLIST</div>
+        <div class="playlist-list" id="playlistList" role="list"></div>
+      </div>
     </div>
 
   </div>
 </div>
 
-<audio id="audio" preload="metadata" crossorigin="anonymous">
-  <source src="https://raw.githubusercontent.com/ajardan/deb_jungle/refs/heads/master/mAcRoS-Junglebrain.mp3" type="audio/mpeg">
-</audio>
+<audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 
 <script>
 (function () {
@@ -428,6 +464,16 @@
   var vizCanvas = document.getElementById('viz');
   var vctx     = vizCanvas.getContext('2d');
 
+  /* ── Playlist ── */
+  var playlist = [
+    {
+      title: 'Junglebrain',
+      artist: 'mAcRoS',
+      src: 'https://raw.githubusercontent.com/ajardan/deb_jungle/refs/heads/master/mAcRoS-Junglebrain.mp3'
+    }
+  ];
+  var currentTrackIndex = 0;
+
   var audioCtx, source, analyser, gainNode, dataArr;
   var vizRAF;
   var playing = false;
@@ -443,6 +489,67 @@
 
   function setStatus(msg) {
     status.innerHTML = msg + '<span class="cursor"></span>';
+  }
+
+  function renderPlaylist() {
+    var list = document.getElementById('playlistList');
+    list.innerHTML = '';
+    playlist.forEach(function (track, i) {
+      var item = document.createElement('div');
+      item.className = 'playlist-item' + (i === currentTrackIndex ? ' active' : '');
+      item.setAttribute('role', 'listitem');
+      item.setAttribute('tabindex', '0');
+      item.innerHTML =
+        '<span class="pl-num">' + (i + 1) + '</span>' +
+        '<span class="pl-artist">' + track.artist + '</span>' +
+        '&nbsp;&mdash;&nbsp;' + track.title;
+      item.addEventListener('click', function () { playTrack(i); });
+      item.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playTrack(i); }
+      });
+      list.appendChild(item);
+    });
+  }
+
+  function setTrackNameUI(track) {
+    document.getElementById('trackName').innerHTML =
+      '<span style="opacity:0.6;font-size:0.85em">' + track.artist + '</span>' +
+      '&nbsp;&mdash;&nbsp;' + track.title + '<span class="cursor"></span>';
+  }
+
+  function loadTrack(index) {
+    currentTrackIndex = index;
+    var track = playlist[index];
+    audio.pause();
+    playing = false;
+    playBtn.innerHTML = '&#9654; PLAY';
+    playBtn.classList.remove('active');
+    seek.value = 0;
+    elapsed.textContent = '00:00';
+    duration.textContent = '--:--';
+    audio.src = track.src;
+    audio.load();
+    setTrackNameUI(track);
+    renderPlaylist();
+    setStatus('LOADING \u2014 ' + track.artist.toUpperCase() + ' \u2014 ' + track.title.toUpperCase());
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  }
+
+  function playTrack(index) {
+    loadTrack(index);
+    setTimeout(function () { playBtn.click(); }, 50);
+  }
+
+  function prevTrack() {
+    var wasPlaying = playing;
+    loadTrack((currentTrackIndex - 1 + playlist.length) % playlist.length);
+    if (wasPlaying) setTimeout(function () { playBtn.click(); }, 50);
+  }
+
+  function nextTrack() {
+    var wasPlaying = playing;
+    loadTrack((currentTrackIndex + 1) % playlist.length);
+    if (wasPlaying) setTimeout(function () { playBtn.click(); }, 50);
   }
 
   function initAudioCtx() {
@@ -533,9 +640,10 @@
   /* ── Media Session (lock screen / background playback on mobile) ── */
   function updateMediaSession() {
     if (!('mediaSession' in navigator)) return;
+    var track = playlist[currentTrackIndex];
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: 'Junglebrain',
-      artist: 'mAcRoS',
+      title: track.title,
+      artist: track.artist,
       album: 'Jungle.md'
     });
     navigator.mediaSession.setActionHandler('play', function () { playBtn.click(); });
@@ -549,6 +657,7 @@
   /* ── Controls ── */
   playBtn.addEventListener('click', function () {
     if (!playing) {
+      if (!audio.src) audio.src = playlist[currentTrackIndex].src;
       initAudioCtx();
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
       audio.play().then(function () {
@@ -603,7 +712,11 @@
     playBtn.classList.remove('active');
     seek.value = 0;
     elapsed.textContent = '00:00';
-    setStatus('PLAYBACK COMPLETE');
+    if (playlist.length > 1) {
+      nextTrack();
+    } else {
+      setStatus('PLAYBACK COMPLETE');
+    }
   });
 
   audio.addEventListener('error', function () {
@@ -615,6 +728,9 @@
       audio.currentTime = (seek.value / 100) * audio.duration;
     }
   });
+
+  document.getElementById('prevBtn').addEventListener('click', prevTrack);
+  document.getElementById('nextBtn').addEventListener('click', nextTrack);
 
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && e.target === document.body) {
@@ -666,6 +782,10 @@
       setStatus(muted ? 'MUTED — STILL STREAMING' : 'STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
     }
   });
+
+  /* ── Init ── */
+  setTrackNameUI(playlist[0]);
+  renderPlaylist();
 })();
 </script>
 </body>
