@@ -558,6 +558,7 @@
   var playing = false;
   var muted = false;
   var gainConnected = false;
+  var backgroundBypass = false;
 
   function fmt(s) {
     if (!isFinite(s)) return '--:--';
@@ -666,10 +667,7 @@
        Pause the audio element so time doesn't drift silently;
        auto-resume both when the AudioContext comes back. */
     audioCtx.onstatechange = function () {
-      if (audioCtx.state === 'suspended' && playing) {
-        audio.pause();
-        audioCtx.resume().catch(function () {});
-      } else if (audioCtx.state === 'running' && playing && audio.paused) {
+      if (audioCtx.state === 'running' && playing && audio.paused) {
         audio.play().catch(function () {});
       }
     };
@@ -761,10 +759,37 @@
   window.addEventListener('resize', resizeViz);
   drawViz();
 
-  /* ── Resume when returning to the app (triggers onstatechange → audio.play) ── */
+  /* ── Background audio routing ──
+     iOS suspends AudioContext when the tab is hidden. Because audio output is
+     routed through the Web Audio graph (source→analyser→gainNode→destination),
+     a suspended context produces silence even while audio.play() is running.
+     Fix: on hide, bypass the graph by connecting source directly to destination
+     so the <audio> element's output reaches the speakers without needing the
+     AudioContext to process it. On show, restore the full chain. */
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && audioCtx && playing) {
-      audioCtx.resume().catch(function () {});
+    if (document.visibilityState === 'hidden') {
+      if (source && analyser && playing && !backgroundBypass) {
+        try {
+          source.disconnect();
+          source.connect(audioCtx.destination);
+          backgroundBypass = true;
+        } catch (e) {}
+      }
+    } else {
+      if (backgroundBypass && source && analyser) {
+        try {
+          source.disconnect();
+          source.connect(analyser);
+          analyser.connect(gainNode);
+          gainConnected = false;
+          if (!muted) {
+            gainNode.connect(audioCtx.destination);
+            gainConnected = true;
+          }
+          backgroundBypass = false;
+        } catch (e) {}
+      }
+      if (audioCtx && playing) audioCtx.resume().catch(function () {});
     }
   });
 
@@ -783,6 +808,14 @@
     navigator.mediaSession.setActionHandler('seekto', function (e) {
       if (audio.duration) audio.currentTime = e.seekTime;
     });
+    navigator.mediaSession.setActionHandler('seekbackward', function (e) {
+      audio.currentTime = Math.max(0, audio.currentTime - (e.seekOffset || 10));
+    });
+    navigator.mediaSession.setActionHandler('seekforward', function (e) {
+      audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + (e.seekOffset || 10));
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', function () { prevTrack(); });
+    navigator.mediaSession.setActionHandler('nexttrack', function () { nextTrack(); });
   }
 
   /* ── Controls ── */
