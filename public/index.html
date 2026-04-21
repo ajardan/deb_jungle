@@ -248,6 +248,18 @@
       gap: 10px;
       margin-top: 22px;
     }
+    /* Allow grid to shrink items below their min-content size */
+    .controls .btn { min-width: 0; text-align: center; }
+    /* On narrow screens reduce horizontal padding so text fits in equal columns */
+    @media (max-width: 560px) {
+      .controls .btn,
+      .controls .btn.primary {
+        padding-left: 6px;
+        padding-right: 6px;
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+      }
+    }
 
     .btn {
       background: none;
