@@ -560,7 +560,6 @@
   var playing = false;
   var muted = false;
   var gainConnected = false;
-  var backgroundBypass = false;
 
   function fmt(s) {
     if (!isFinite(s)) return '--:--';
@@ -662,8 +661,18 @@
     if (wasPlaying) setTimeout(function () { playBtn.click(); }, 50);
   }
 
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
   function initAudioCtx() {
     if (audioCtx) return;
+    /* On iOS, createMediaElementSource permanently routes audio through the
+       Web Audio graph. iOS suspends AudioContext in background, silencing it.
+       Skip Web Audio API on iOS so the <audio> element plays natively and
+       continues in background. Volume and mute fall back to audio.volume/muted. */
+    if (isIOS()) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     /* iOS suspends AudioContext when switching apps.
        Pause the audio element so time doesn't drift silently;
@@ -761,37 +770,10 @@
   window.addEventListener('resize', resizeViz);
   drawViz();
 
-  /* ── Background audio routing ──
-     iOS suspends AudioContext when the tab is hidden. Because audio output is
-     routed through the Web Audio graph (source→analyser→gainNode→destination),
-     a suspended context produces silence even while audio.play() is running.
-     Fix: on hide, bypass the graph by connecting source directly to destination
-     so the <audio> element's output reaches the speakers without needing the
-     AudioContext to process it. On show, restore the full chain. */
+  /* ── Resume AudioContext when returning to the tab (desktop) ── */
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden') {
-      if (source && analyser && playing && !backgroundBypass) {
-        try {
-          source.disconnect();
-          source.connect(audioCtx.destination);
-          backgroundBypass = true;
-        } catch (e) {}
-      }
-    } else {
-      if (backgroundBypass && source && analyser) {
-        try {
-          source.disconnect();
-          source.connect(analyser);
-          analyser.connect(gainNode);
-          gainConnected = false;
-          if (!muted) {
-            gainNode.connect(audioCtx.destination);
-            gainConnected = true;
-          }
-          backgroundBypass = false;
-        } catch (e) {}
-      }
-      if (audioCtx && playing) audioCtx.resume().catch(function () {});
+    if (document.visibilityState === 'visible' && audioCtx && playing) {
+      audioCtx.resume().catch(function () {});
     }
   });
 
