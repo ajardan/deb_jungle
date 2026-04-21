@@ -243,12 +243,11 @@
 
     /* ── Controls row ── */
     .controls {
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
       gap: 10px;
       margin-top: 22px;
     }
-    .controls .btn { flex: 1; }
 
     .btn {
       background: none;
