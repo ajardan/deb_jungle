@@ -279,15 +279,12 @@
       box-shadow: 0 0 16px var(--green-glow);
     }
 
-    /* ── Volume ── */
-    .vol-wrap {
+    /* ── Volume row (sits below controls, full width) ── */
+    .vol-row {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
       gap: 10px;
-      margin-left: auto;
-      flex-shrink: 0;
-      padding-right: 6px;
+      margin-top: 10px;
     }
     .vol-icon {
       font-size: 0.65rem;
@@ -309,7 +306,7 @@
       --fill: 100%;
       -webkit-appearance: none;
       appearance: none;
-      width: 80px;
+      flex: 1;
       height: 4px;
       background: var(--green-dark);
       border: 1px solid var(--green-dim);
@@ -350,10 +347,6 @@
       cursor: pointer;
       border: none;
       border-radius: 0;
-    }
-    /* On touch devices shorten the slider */
-    @media (hover: none) and (pointer: coarse) {
-      .vol-slider { width: 60px; }
     }
 
     /* ── Status line ── */
@@ -451,11 +444,11 @@
         <button class="btn" id="stopBtn" aria-label="Stop">&#9632; STOP</button>
         <button class="btn sm" id="prevBtn" aria-label="Previous track">&#9664; PREV</button>
         <button class="btn sm" id="nextBtn" aria-label="Next track">NEXT &#9654;</button>
-        <div class="vol-wrap">
-          <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">[MUTE]</button>
-          <input type="range" class="vol-slider" id="vol" min="0" max="1"
-                 step="0.02" value="1" aria-label="Volume">
-        </div>
+      </div>
+      <div class="vol-row">
+        <button class="vol-icon" id="volIcon" type="button" title="Mute / Unmute" aria-label="Mute / Unmute">[MUTE]</button>
+        <input type="range" class="vol-slider" id="vol" min="0" max="1"
+               step="0.02" value="1" aria-label="Volume">
       </div>
 
       <div class="status" id="status">READY — PRESS PLAY TO INITIALIZE<span class="cursor"></span></div>
@@ -671,7 +664,7 @@
     try {
       source   = audioCtx.createMediaElementSource(audio);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 128;
+      analyser.fftSize = 64;
       dataArr  = new Uint8Array(analyser.frequencyBinCount);
       gainNode = audioCtx.createGain();
       gainNode.gain.value = parseFloat(volSlider.value);
@@ -724,17 +717,21 @@
       return;
     }
 
-    var barW = Math.floor(w / dataArr.length);
-    for (var i = 0; i < dataArr.length; i++) {
+    /* Float bar widths so bars tile the full canvas with no trailing gap */
+    var barCount = dataArr.length;
+    var barW = w / barCount;
+    for (var i = 0; i < barCount; i++) {
       var barH = (dataArr[i] / 255) * h;
       if (barH < 1) continue;
       var alpha = 0.4 + (dataArr[i] / 255) * 0.6;
+      var x = Math.round(i * barW);
+      var bw = Math.max(1, Math.round((i + 1) * barW) - x - 1);
       /* Bar body */
       vctx.fillStyle = 'rgba(0,255,65,' + alpha + ')';
-      vctx.fillRect(i * barW, h - barH, barW - 1, barH);
+      vctx.fillRect(x, h - barH, bw, barH);
       /* Bright top cap */
       vctx.fillStyle = 'rgba(0,255,65,0.9)';
-      vctx.fillRect(i * barW, h - barH, barW - 1, 2);
+      vctx.fillRect(x, h - barH, bw, 2);
     }
   }
 
