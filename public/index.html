@@ -74,7 +74,12 @@
       opacity: 0.18;
     }
 
-    /* ── Scanline overlay ── */
+    /* ── Scanline overlay with subtle CRT flicker ── */
+    @keyframes scanflicker {
+      0%, 89%, 91%, 93%, 100% { opacity: 1; }
+      90%  { opacity: 0.97; }
+      92%  { opacity: 0.95; }
+    }
     body::after {
       content: '';
       position: fixed;
@@ -88,6 +93,7 @@
         rgba(0,0,0,0.18) 4px
       );
       pointer-events: none;
+      animation: scanflicker 5.7s step-end infinite;
     }
 
     /* ── Layout ── */
@@ -101,7 +107,7 @@
     }
 
     .terminal {
-      width: min(520px, 94vw);
+      width: min(560px, 94vw);
       border: 1px solid var(--green-dim);
       border-radius: 2px;
       background: rgba(0, 10, 2, 0.88);
@@ -156,11 +162,20 @@
       letter-spacing: 0.05em;
       color: var(--green);
       text-shadow: 0 0 8px var(--green);
+      display: inline-block;
+    }
+    @keyframes marquee-scroll {
+      0%, 15%   { transform: translateX(0); }
+      85%, 100% { transform: translateX(var(--marquee-dist, 0px)); }
+    }
+    .track-name.marquee {
+      animation: marquee-scroll 12s ease-in-out infinite alternate;
     }
 
     /* ── Progress bar ── */
     .progress-wrap { margin-bottom: 10px; }
     .progress-bar {
+      --fill: 0%;
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
@@ -169,6 +184,26 @@
       border: 1px solid var(--green-dim);
       cursor: pointer;
       outline: none;
+      border-radius: 0;
+    }
+    .progress-bar::-webkit-slider-runnable-track {
+      height: 6px;
+      background: linear-gradient(
+        to right,
+        var(--green-dim) var(--fill),
+        var(--green-dark) var(--fill)
+      );
+      border: 1px solid var(--green-dim);
+      border-radius: 0;
+    }
+    .progress-bar::-moz-range-track {
+      height: 6px;
+      background: linear-gradient(
+        to right,
+        var(--green-dim) var(--fill),
+        var(--green-dark) var(--fill)
+      );
+      border: 1px solid var(--green-dim);
       border-radius: 0;
     }
     .progress-bar::-webkit-slider-thumb {
@@ -200,8 +235,8 @@
     #viz {
       display: block;
       width: 100%;
-      height: 52px;
-      margin: 18px 0;
+      height: 80px;
+      margin: 14px 0 18px;
       border: 1px solid var(--green-dark);
       background: rgba(0,255,65,0.02);
     }
@@ -271,6 +306,7 @@
     }
     .vol-icon:hover { opacity: 0.9; }
     .vol-slider {
+      --fill: 100%;
       -webkit-appearance: none;
       appearance: none;
       width: 80px;
@@ -279,6 +315,26 @@
       border: 1px solid var(--green-dim);
       cursor: pointer;
       outline: none;
+      border-radius: 0;
+    }
+    .vol-slider::-webkit-slider-runnable-track {
+      height: 4px;
+      background: linear-gradient(
+        to right,
+        var(--green-dim) var(--fill),
+        var(--green-dark) var(--fill)
+      );
+      border: 1px solid var(--green-dim);
+      border-radius: 0;
+    }
+    .vol-slider::-moz-range-track {
+      height: 4px;
+      background: linear-gradient(
+        to right,
+        var(--green-dim) var(--fill),
+        var(--green-dark) var(--fill)
+      );
+      border: 1px solid var(--green-dim);
       border-radius: 0;
     }
     .vol-slider::-webkit-slider-thumb {
@@ -450,7 +506,16 @@
 
     resize();
     window.addEventListener('resize', resize);
-    setInterval(draw, 50);
+
+    /* RAF with ~50 ms throttle — pauses automatically when tab is hidden */
+    var lastRainDraw = 0;
+    function rainLoop(ts) {
+      requestAnimationFrame(rainLoop);
+      if (ts - lastRainDraw < 50) return;
+      lastRainDraw = ts;
+      draw();
+    }
+    requestAnimationFrame(rainLoop);
   })();
 
   /* ── Audio + Visualizer ── */
@@ -464,6 +529,9 @@
   var status   = document.getElementById('status');
   var vizCanvas = document.getElementById('viz');
   var vctx     = vizCanvas.getContext('2d');
+
+  /* Logical (CSS) pixel dimensions used for all drawing */
+  var vizW = 0, vizH = 0;
 
   /* ── Playlist ── */
   var playlist = [
@@ -497,6 +565,32 @@
     status.innerHTML = msg + '<span class="cursor"></span>';
   }
 
+  function updateSeekFill() {
+    var pct = parseFloat(seek.value) || 0;
+    seek.style.setProperty('--fill', pct.toFixed(2) + '%');
+  }
+
+  function updateVolFill() {
+    var pct = (parseFloat(volSlider.value) || 0) * 100;
+    volSlider.style.setProperty('--fill', pct.toFixed(1) + '%');
+  }
+
+  function checkMarquee() {
+    var el = document.getElementById('trackName');
+    var wrap = el.parentElement;
+    /* Allow one frame for layout to settle before measuring */
+    setTimeout(function () {
+      if (el.scrollWidth > wrap.clientWidth + 4) {
+        var dist = el.scrollWidth - wrap.clientWidth;
+        el.style.setProperty('--marquee-dist', '-' + dist + 'px');
+        el.classList.add('marquee');
+      } else {
+        el.classList.remove('marquee');
+        el.style.removeProperty('--marquee-dist');
+      }
+    }, 60);
+  }
+
   function renderPlaylist() {
     var list = document.getElementById('playlistList');
     list.innerHTML = '';
@@ -521,6 +615,7 @@
     document.getElementById('trackName').innerHTML =
       '<span style="opacity:0.6;font-size:0.85em">' + track.artist + '</span>' +
       '&nbsp;&mdash;&nbsp;' + track.title + '<span class="cursor"></span>';
+    checkMarquee();
   }
 
   function loadTrack(index) {
@@ -531,13 +626,14 @@
     playBtn.innerHTML = '&#9654; PLAY';
     playBtn.classList.remove('active');
     seek.value = 0;
+    updateSeekFill();
     elapsed.textContent = '00:00';
     duration.textContent = '--:--';
     audio.src = track.src;
     audio.load();
     setTrackNameUI(track);
     renderPlaylist();
-    setStatus('LOADING \u2014 ' + track.artist.toUpperCase() + ' \u2014 ' + track.title.toUpperCase());
+    setStatus('LOADING — ' + track.artist.toUpperCase() + ' — ' + track.title.toUpperCase());
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
   }
 
@@ -575,7 +671,7 @@
     try {
       source   = audioCtx.createMediaElementSource(audio);
       analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
+      analyser.fftSize = 128;
       dataArr  = new Uint8Array(analyser.frequencyBinCount);
       gainNode = audioCtx.createGain();
       gainNode.gain.value = parseFloat(volSlider.value);
@@ -598,21 +694,31 @@
 
   function drawViz() {
     vizRAF = requestAnimationFrame(drawViz);
-    var w = vizCanvas.width, h = vizCanvas.height;
+    var w = vizW, h = vizH;
 
     if (analyser) analyser.getByteFrequencyData(dataArr);
 
     vctx.clearRect(0, 0, w, h);
 
     if (!analyser || !playing) {
-      /* idle pulse */
+      /* idle: two overlapping sine waves */
       var t = Date.now() / 1000;
-      vctx.strokeStyle = 'rgba(0,255,65,0.25)';
+
+      vctx.strokeStyle = 'rgba(0,255,65,0.18)';
       vctx.lineWidth = 1;
       vctx.beginPath();
       for (var x = 0; x < w; x++) {
-        var y = h / 2 + Math.sin((x / w) * Math.PI * 8 + t * 2) * 4;
+        var y = h / 2 + Math.sin((x / w) * Math.PI * 12 + t * 1.3) * 3;
         x === 0 ? vctx.moveTo(x, y) : vctx.lineTo(x, y);
+      }
+      vctx.stroke();
+
+      vctx.strokeStyle = 'rgba(0,255,65,0.28)';
+      vctx.lineWidth = 1;
+      vctx.beginPath();
+      for (var x2 = 0; x2 < w; x2++) {
+        var y2 = h / 2 + Math.sin((x2 / w) * Math.PI * 7 + t * 2.1) * 5;
+        x2 === 0 ? vctx.moveTo(x2, y2) : vctx.lineTo(x2, y2);
       }
       vctx.stroke();
       return;
@@ -621,15 +727,25 @@
     var barW = Math.floor(w / dataArr.length);
     for (var i = 0; i < dataArr.length; i++) {
       var barH = (dataArr[i] / 255) * h;
+      if (barH < 1) continue;
       var alpha = 0.4 + (dataArr[i] / 255) * 0.6;
+      /* Bar body */
       vctx.fillStyle = 'rgba(0,255,65,' + alpha + ')';
       vctx.fillRect(i * barW, h - barH, barW - 1, barH);
+      /* Bright top cap */
+      vctx.fillStyle = 'rgba(0,255,65,0.9)';
+      vctx.fillRect(i * barW, h - barH, barW - 1, 2);
     }
   }
 
   function resizeViz() {
-    vizCanvas.width  = vizCanvas.offsetWidth;
-    vizCanvas.height = vizCanvas.offsetHeight;
+    var dpr = window.devicePixelRatio || 1;
+    vizW = vizCanvas.offsetWidth;
+    vizH = vizCanvas.offsetHeight;
+    vizCanvas.width  = vizW * dpr;
+    vizCanvas.height = vizH * dpr;
+    vctx = vizCanvas.getContext('2d');
+    vctx.scale(dpr, dpr);
   }
 
   resizeViz();
@@ -693,6 +809,7 @@
     playBtn.innerHTML = '&#9654; PLAY';
     playBtn.classList.remove('active');
     seek.value = 0;
+    updateSeekFill();
     elapsed.textContent = '00:00';
     setStatus('STOPPED — READY');
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
@@ -700,7 +817,9 @@
 
   audio.addEventListener('timeupdate', function () {
     if (!audio.duration) return;
-    seek.value = (audio.currentTime / audio.duration) * 100;
+    var pct = (audio.currentTime / audio.duration) * 100;
+    seek.value = pct;
+    updateSeekFill();
     elapsed.textContent = fmt(audio.currentTime);
     if (playing) {
       setStatus('STREAMING — ' + fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
@@ -717,6 +836,7 @@
     playBtn.innerHTML = '&#9654; PLAY';
     playBtn.classList.remove('active');
     seek.value = 0;
+    updateSeekFill();
     elapsed.textContent = '00:00';
     if (playlist.length > 1) {
       nextTrack();
@@ -730,6 +850,7 @@
   });
 
   seek.addEventListener('input', function () {
+    updateSeekFill();
     if (audio.duration) {
       audio.currentTime = (seek.value / 100) * audio.duration;
     }
@@ -752,6 +873,7 @@
 
   function handleVolChange() {
     var val = parseFloat(volSlider.value);
+    updateVolFill();
     /* Moving slider > 0 while muted auto-unmutes */
     if (muted && val > 0) {
       muted = false;
@@ -792,6 +914,7 @@
   /* ── Init ── */
   setTrackNameUI(playlist[0]);
   renderPlaylist();
+  updateVolFill();
 })();
 </script>
 </body>
